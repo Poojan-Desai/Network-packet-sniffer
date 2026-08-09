@@ -1,4 +1,8 @@
 .venv/
+.audit-venv/
 __pycache__/
+.pytest_cache/
+.cache/
 *.pcap
 summary.json
+packets.csv
