@@ -8,7 +8,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Iterable
 
-from scapy.all import IP, TCP, UDP, get_if_list, rdpcap, sniff, wrpcap
+from scapy.all import IP, IPv6, TCP, UDP, get_if_list, rdpcap, sniff, wrpcap
 
 
 def packet_to_row(packet) -> dict[str, object]:
@@ -17,23 +17,32 @@ def packet_to_row(packet) -> dict[str, object]:
         "timestamp": float(packet.time),
         "length_bytes": len(packet),
         "protocol": "NON_IP",
+        "ip_version": "",
         "source_ip": "",
         "destination_ip": "",
         "source_port": "",
         "destination_port": "",
+        "tcp_flags": "",
     }
 
-    if IP not in packet:
+    if IP in packet:
+        network_layer = packet[IP]
+        row["ip_version"] = 4
+    elif IPv6 in packet:
+        network_layer = packet[IPv6]
+        row["ip_version"] = 6
+    else:
         return row
 
-    row["source_ip"] = packet[IP].src
-    row["destination_ip"] = packet[IP].dst
+    row["source_ip"] = network_layer.src
+    row["destination_ip"] = network_layer.dst
     row["protocol"] = "OTHER_IP"
 
     if TCP in packet:
         row["protocol"] = "TCP"
         row["source_port"] = int(packet[TCP].sport)
         row["destination_port"] = int(packet[TCP].dport)
+        row["tcp_flags"] = str(packet[TCP].flags)
     elif UDP in packet:
         row["protocol"] = "UDP"
         row["source_port"] = int(packet[UDP].sport)
@@ -46,6 +55,9 @@ def summarize(packets: Iterable) -> dict[str, object]:
     """Return aggregate traffic counts without storing packet payloads."""
     rows = [packet_to_row(packet) for packet in packets]
     protocol_counts = Counter(row["protocol"] for row in rows)
+    ip_version_counts = Counter(
+        str(row["ip_version"]) for row in rows if row["ip_version"] != ""
+    )
     top_sources = Counter(row["source_ip"] for row in rows if row["source_ip"])
     top_destinations = Counter(
         row["destination_ip"] for row in rows if row["destination_ip"]
@@ -55,14 +67,23 @@ def summarize(packets: Iterable) -> dict[str, object]:
         for row in rows
         if row["destination_port"] != ""
     )
+    top_conversations = Counter(
+        (row["source_ip"], row["destination_ip"])
+        for row in rows
+        if row["source_ip"] and row["destination_ip"]
+    )
+    tcp_flag_counts = Counter(row["tcp_flags"] for row in rows if row["tcp_flags"])
 
     return {
         "total_packets": len(rows),
         "total_bytes": sum(int(row["length_bytes"]) for row in rows),
         "protocol_counts": dict(protocol_counts),
+        "ip_version_counts": dict(ip_version_counts),
         "top_sources": top_sources.most_common(10),
         "top_destinations": top_destinations.most_common(10),
         "top_destination_ports": top_destination_ports.most_common(10),
+        "top_conversations": top_conversations.most_common(10),
+        "tcp_flag_counts": dict(tcp_flag_counts),
     }
 
 
@@ -76,10 +97,12 @@ def write_csv(packets: Iterable, path: Path) -> None:
         "timestamp",
         "length_bytes",
         "protocol",
+        "ip_version",
         "source_ip",
         "destination_ip",
         "source_port",
         "destination_port",
+        "tcp_flags",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
