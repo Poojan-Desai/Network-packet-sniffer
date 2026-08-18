@@ -1,6 +1,8 @@
 # Network Traffic Analyzer
 
-A Python and Scapy command-line tool for capturing live traffic or inspecting an existing PCAP. It produces an aggregate JSON summary and a per-packet CSV report without exporting packet payloads.
+A Python and Scapy command-line tool for capturing live traffic or inspecting
+an existing PCAP. It produces an aggregate JSON summary and a per-packet CSV
+report without exporting packet payloads.
 
 ## Why I built it
 
@@ -11,7 +13,8 @@ I built this project to practice packet capture, protocol inspection, and turnin
 - Capture a fixed number of live packets from a selected interface
 - Apply an optional BPF capture filter
 - Analyze an existing PCAP without root access
-- Summarize protocol counts, byte volume, endpoints, and destination ports
+- Summarize IPv4/IPv6 traffic, protocol counts, byte volume, endpoints,
+  conversations, destination ports, and TCP flag patterns
 - Export aggregate JSON and flat per-packet CSV
 - Unit-test the analysis path with synthetic packets—no live capture required
 
@@ -58,7 +61,10 @@ python sniffer.py --read-pcap capture.pcap \
   --csv packets.csv
 ```
 
-The JSON report includes `total_packets`, `total_bytes`, protocol counts, top source and destination IPs, and top destination ports. The CSV contains one row per packet with timestamp, size, protocol, endpoint, and port metadata.
+The JSON report includes packet/byte totals, IP-version and protocol counts, top
+endpoints and conversations, destination ports, and TCP flag patterns. The CSV
+contains one row per packet with timestamp, size, protocol, IP version,
+endpoint, port, and TCP-flag metadata.
 
 ## Tests
 
@@ -71,7 +77,7 @@ The tests build synthetic TCP, UDP, and non-IP packets, then verify normalizatio
 
 ## Limitations and responsible use
 
-- IPv6-specific aggregation and deep packet inspection are not implemented.
+- IPv6 extension-header interpretation and deep packet inspection are not implemented.
 - Encrypted application payloads are not decrypted or interpreted.
 - Capture only networks and systems you own or have explicit permission to test.
 - PCAPs may contain sensitive traffic metadata; generated captures and reports are ignored by Git.
